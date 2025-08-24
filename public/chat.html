@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>チャット</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sidebar">
+  <h3>部屋一覧</h3>
+  <ul id="rooms"></ul>
+  <input id="newRoom" placeholder="新しい部屋">
+  <button id="createRoom">作成</button>
+</div>
+
+<div class="chat-container">
+  <h3 id="roomName">ルーム名</h3>
+  <ul id="messages"></ul>
+  <form id="form">
+    <input id="input" autocomplete="off" placeholder="メッセージ...">
+    <input type="file" id="fileInput">
+    <button>送信</button>
+  </form>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "chat-app",
+  "version": "1.0.0",
+  "description": "インスタ風チャットアプリ（完全版）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "yourname",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "multer": "^1.4.5",
+    "sqlite3": "^5.1.6"
+  }
+}

@@ -1,1 +1,42 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ログイン</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="login-container">
+  <h2>ログイン / 新規登録</h2>
+  <input id="username" placeholder="ユーザー名">
+  <input id="password" type="password" placeholder="パスワード">
+  <button id="loginBtn">ログイン</button>
+  <button id="registerBtn">登録</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+const loginBtn = document.getElementById("loginBtn");
+const registerBtn = document.getElementById("registerBtn");
+const msg = document.getElementById("msg");
+
+loginBtn.onclick = async () => {
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: document.getElementById("username").value, password: document.getElementById("password").value })
+  });
+  const data = await res.json();
+  if (data.ok) window.location.href = "/chat.html?user=" + encodeURIComponent(document.getElementById("username").value);
+  else msg.textContent = data.msg;
+};
+
+registerBtn.onclick = async () => {
+  const res = await fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: document.getElementById("username").value, password: document.getElementById("password").value })
+  });
+  const data = await res.json();
+  msg.textContent = data.ok ? "登録完了！

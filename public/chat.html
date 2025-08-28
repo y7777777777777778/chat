@@ -1,29 +1,107 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>チャット</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>チャット</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background: #fff;
+    }
+    #messages div {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 8px;
+    }
+    .mine {
+      background: #dcf8c6;
+      align-self: flex-end;
+    }
+    .other {
+      background: #f1f0f0;
+      align-self: flex-start;
+    }
+    #form {
+      display: flex;
+      padding: 10px;
+      background: #eee;
+    }
+    #input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 20px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 20px;
+      background: #3897f0;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #287dc9;
+    }
+  </style>
 </head>
 <body>
-<div class="sidebar">
-  <h3>部屋一覧</h3>
-  <ul id="rooms"></ul>
-  <input id="newRoom" placeholder="新しい部屋">
-  <button id="createRoom">作成</button>
-</div>
-
-<div class="chat-container">
-  <h3 id="roomName">ルーム名</h3>
-  <ul id="messages"></ul>
+  <div id="messages"></div>
   <form id="form">
-    <input id="input" autocomplete="off" placeholder="メッセージ...">
-    <input type="file" id="fileInput">
+    <input id="input" autocomplete="off" placeholder="メッセージを入力">
     <button>送信</button>
   </form>
-</div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="client.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get("room") || "default";
+
+    const socket = io({ query: { room } });
+
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const messages = document.getElementById("messages");
+
+    // 過去ログを読み込む
+    fetch(`/history?room=${room}`)
+      .then(res => res.json())
+      .then(history => {
+        history.forEach(msg => {
+          addMessage(msg.username, msg.text, msg.username === localStorage.getItem("username"));
+        });
+      });
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+      if (input.value) {
+        socket.emit("chat message", { text: input.value });
+        input.value = "";
+      }
+    });
+
+    socket.on("chat message", function(msg) {
+      addMessage(msg.username, msg.text, msg.username === localStorage.getItem("username"));
+    });
+
+    function addMessage(user, text, mine) {
+      const div = document.createElement("div");
+      div.className = mine ? "mine" : "other";
+      div.innerText = user + ": " + text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+  </script>
 </body>
 </html>

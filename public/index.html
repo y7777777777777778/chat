@@ -1,42 +1,102 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>ログイン</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>ログイン / 新規登録</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f2f5;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 320px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 1rem;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #0095f6;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #0077cc;
+    }
+    .switch {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #555;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-<div class="login-container">
-  <h2>ログイン / 新規登録</h2>
-  <input id="username" placeholder="ユーザー名">
-  <input id="password" type="password" placeholder="パスワード">
-  <button id="loginBtn">ログイン</button>
-  <button id="registerBtn">登録</button>
-  <div id="msg"></div>
-</div>
+  <div class="container">
+    <h2 id="formTitle">ログイン</h2>
+    <input type="text" id="username" placeholder="ユーザー名">
+    <input type="password" id="password" placeholder="パスワード">
+    <button onclick="submitForm()">ログイン</button>
+    <div class="switch" onclick="toggleForm()">👉 新規登録はこちら</div>
+  </div>
 
-<script>
-const loginBtn = document.getElementById("loginBtn");
-const registerBtn = document.getElementById("registerBtn");
-const msg = document.getElementById("msg");
+  <script>
+    let isLogin = true;
 
-loginBtn.onclick = async () => {
-  const res = await fetch("/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: document.getElementById("username").value, password: document.getElementById("password").value })
-  });
-  const data = await res.json();
-  if (data.ok) window.location.href = "/chat.html?user=" + encodeURIComponent(document.getElementById("username").value);
-  else msg.textContent = data.msg;
-};
+    function toggleForm() {
+      isLogin = !isLogin;
+      document.getElementById("formTitle").innerText = isLogin ? "ログイン" : "新規登録";
+      document.querySelector("button").innerText = isLogin ? "ログイン" : "登録";
+      document.querySelector(".switch").innerText = isLogin ? "👉 新規登録はこちら" : "👉 ログインはこちら";
+    }
 
-registerBtn.onclick = async () => {
-  const res = await fetch("/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: document.getElementById("username").value, password: document.getElementById("password").value })
-  });
-  const data = await res.json();
-  msg.textContent = data.ok ? "登録完了！
+    async function submitForm() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!username || !password) {
+        alert("ユーザー名とパスワードを入力してください");
+        return;
+      }
+
+      const endpoint = isLogin ? "/login" : "/register";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem("username", username);
+        window.location.href = "/room.html";
+      } else {
+        alert(data.message);
+      }
+    }
+  </script>
+</body>
+</html>

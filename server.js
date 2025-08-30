@@ -1,142 +1,122 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
-const bodyParser = require("body-parser");
-const session = require("express-session");
 const sqlite3 = require("sqlite3").verbose();
 const { Server } = require("socket.io");
+const bodyParser = require("body-parser");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// ===== SQLite 設定 =====
-const db = new sqlite3.Database("./chat.db");
+// SQLite データベース
+const db = new sqlite3.Database("./chatapp.db");
 
-// ユーザーテーブル
-db.run(`CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE,
-  password TEXT
-)`);
+// テーブル作成
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+  )`);
 
-// メッセージテーブル
-db.run(`CREATE TABLE IF NOT EXISTS messages (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  room TEXT,
-  username TEXT,
-  message TEXT,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-)`);
+  db.run(`CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room TEXT,
+    username TEXT,
+    message TEXT,
+    image TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-// ===== ミドルウェア =====
-app.use(bodyParser.urlencoded({ extended: true }));
+  db.run(`CREATE TABLE IF NOT EXISTS rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE
+  )`);
+});
+
 app.use(express.static(path.join(__dirname, "public")));
-app.use(
-  session({
-    secret: "chat-secret",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+app.use(bodyParser.json());
 
-// ===== ページルーティング =====
-app.get("/", (req, res) => {
-  if (!req.session.username) {
-    return res.sendFile(path.join(__dirname, "public", "index.html"));
-  }
-  res.redirect("/rooms");
-});
-
-app.get("/rooms", (req, res) => {
-  if (!req.session.username) return res.redirect("/");
-  res.sendFile(path.join(__dirname, "public", "room.html"));
-});
-
-app.get("/chat/:room", (req, res) => {
-  if (!req.session.username) return res.redirect("/");
-  res.sendFile(path.join(__dirname, "public", "chat.html"));
-});
-
-// ===== 認証 API =====
+// ユーザー登録
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
   db.run(
     "INSERT INTO users (username, password) VALUES (?, ?)",
     [username, password],
-    (err) => {
+    function (err) {
       if (err) {
-        return res.send("登録失敗: ユーザー名は既に存在します");
+        return res.json({ success: false, message: "登録失敗: " + err.message });
       }
-      res.redirect("/");
+      res.json({ success: true, message: "登録成功" });
     }
   );
 });
 
+// ログイン
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
   db.get(
     "SELECT * FROM users WHERE username = ? AND password = ?",
     [username, password],
     (err, row) => {
+      if (err) {
+        return res.json({ success: false, message: "サーバーエラー" });
+      }
       if (row) {
-        req.session.username = username;
-        res.redirect("/rooms");
+        res.json({ success: true, username: row.username });
       } else {
-        res.send("ログイン失敗: ユーザー名またはパスワードが違います");
+        res.json({ success: false, message: "ユーザー名またはパスワードが違います" });
       }
     }
   );
 });
 
-// ===== WebSocket (Socket.IO) =====
-io.on("connection", (socket) => {
-  console.log("ユーザー接続");
-
-  // 部屋参加
-  socket.on("joinRoom", ({ room, username }) => {
-    socket.join(room);
-
-    // 過去ログ送信
-    db.all(
-      "SELECT username, message, timestamp FROM messages WHERE room = ? ORDER BY id ASC",
-      [room],
-      (err, rows) => {
-        if (!err) {
-          socket.emit("chatHistory", rows);
-        }
-      }
-    );
-
-    socket.to(room).emit("message", {
-      username: "システム",
-      message: `${username}さんが参加しました`,
-      timestamp: new Date(),
-    });
-  });
-
-  // メッセージ送信
-  socket.on("chatMessage", ({ room, username, message }) => {
-    db.run("INSERT INTO messages (room, username, message) VALUES (?, ?, ?)", [
-      room,
-      username,
-      message,
-    ]);
-
-    io.to(room).emit("message", {
-      username,
-      message,
-      timestamp: new Date(),
-    });
-  });
-
-  socket.on("disconnect", () => {
-    console.log("ユーザー切断");
+// 部屋一覧
+app.get("/rooms", (req, res) => {
+  db.all("SELECT * FROM rooms", [], (err, rows) => {
+    if (err) return res.json([]);
+    res.json(rows);
   });
 });
 
-// ===== サーバー起動 =====
+// 部屋作成
+app.post("/rooms", (req, res) => {
+  const { roomName } = req.body;
+  db.run("INSERT INTO rooms (name) VALUES (?)", [roomName], function (err) {
+    if (err) {
+      return res.json({ success: false, message: "部屋作成失敗: " + err.message });
+    }
+    res.json({ success: true, id: this.lastID, name: roomName });
+  });
+});
+
+// 過去ログ取得
+app.get("/messages/:room", (req, res) => {
+  const room = req.params.room;
+  db.all("SELECT * FROM messages WHERE room = ? ORDER BY timestamp ASC", [room], (err, rows) => {
+    if (err) return res.json([]);
+    res.json(rows);
+  });
+});
+
+// --- Socket.io ---
+io.on("connection", (socket) => {
+  socket.on("joinRoom", (room, username) => {
+    socket.join(room);
+    socket.to(room).emit("chat message", { username: "system", message: `${username}が参加しました` });
+  });
+
+  socket.on("chat message", ({ room, username, message, image }) => {
+    db.run(
+      "INSERT INTO messages (room, username, message, image) VALUES (?, ?, ?, ?)",
+      [room, username, message, image || null]
+    );
+    io.to(room).emit("chat message", { username, message, image });
+  });
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`サーバー起動 http://localhost:${PORT}`);
 });
